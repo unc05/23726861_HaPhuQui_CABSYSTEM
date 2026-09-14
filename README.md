@@ -1744,6 +1744,63 @@ Các quy tắc trên tương ứng với nhóm yêu cầu BR-04 và FR-06.1 đ�
 
 ---
 
+# Test Cases - CABSYSTEM API
 
+## 1. API POST /rides/validate
+
+### Test Scenario: Kiểm tra tính hợp lệ thông tin đặt xe
+
+| Test Case ID | Test Scenario | Test Case | Preconditions | Test Steps | Test Data | Expected Result | Priority |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| TC-VALIDATE-001 | Kiểm tra thông tin đặt xe | Thông tin đặt xe hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup hợp lệ<br>3. Nhập destination hợp lệ<br>4. Nhập vehicleType hợp lệ | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `CAR` | Trả về HTTP 200. Response có `valid: true`, estimatedFare, estimatedDistanceKm và estimatedDurationMinutes. | High |
+| TC-VALIDATE-002 | Kiểm tra thông tin đặt xe | Pickup không hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup không hợp lệ<br>3. Nhập destination hợp lệ<br>4. Nhập vehicleType hợp lệ | Pickup: `Invalid Location`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `CAR` | Trả về HTTP 400 và thông báo thông tin điểm đi không hợp lệ. | High |
+| TC-VALIDATE-003 | Kiểm tra thông tin đặt xe | Destination không hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup hợp lệ<br>3. Nhập destination không hợp lệ<br>4. Nhập vehicleType hợp lệ | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Invalid Location`<br>VehicleType: `CAR` | Trả về HTTP 400 và thông báo thông tin điểm đến không hợp lệ. | High |
+| TC-VALIDATE-004 | Kiểm tra thông tin đặt xe | Vehicle type không hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup hợp lệ<br>3. Nhập destination hợp lệ<br>4. Nhập loại xe không được hỗ trợ | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `BICYCLE` | Trả về HTTP 400 và thông báo loại xe không hợp lệ. | High |
+| TC-VALIDATE-005 | Kiểm tra thông tin đặt xe | Pickup để rỗng | Backend đang hoạt động | 1. Gửi POST request<br>2. Không nhập pickup<br>3. Nhập destination<br>4. Nhập vehicleType | Pickup: `{}`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `CAR` | Trả về HTTP 400. Hệ thống thông báo pickup location là bắt buộc. | High |
+| TC-VALIDATE-006 | Kiểm tra thông tin đặt xe | Destination để rỗng | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup<br>3. Không nhập destination<br>4. Nhập vehicleType | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `{}`<br>VehicleType: `CAR` | Trả về HTTP 400. Hệ thống thông báo destination là bắt buộc. | High |
+| TC-VALIDATE-007 | Kiểm tra thông tin đặt xe | Vehicle type để rỗng | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup<br>3. Nhập destination<br>4. Không nhập vehicleType | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `empty` | Trả về HTTP 400. Hệ thống thông báo vehicle type là bắt buộc. | High |
+| TC-VALIDATE-008 | Kiểm tra thông tin đặt xe | Toàn bộ request body rỗng | Backend đang hoạt động | 1. Mở API `/rides/validate`<br>2. Gửi POST request với body rỗng | `{}` | Trả về HTTP 400 và thông báo dữ liệu đặt xe không hợp lệ. | High |
+| TC-VALIDATE-009 | Kiểm tra thông tin đặt xe | Pickup và destination giống nhau | Backend đang hoạt động | 1. Nhập pickup<br>2. Nhập destination giống pickup<br>3. Chọn loại xe<br>4. Gửi request | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Đại học Công nghiệp TP.HCM`<br>VehicleType: `CAR` | Hệ thống từ chối hoặc thông báo thông tin điểm đi và điểm đến không hợp lệ. | Medium |
+| TC-VALIDATE-010 | Kiểm tra thông tin đặt xe | Khoảng cách chuyến đi rất ngắn | Backend đang hoạt động | 1. Nhập pickup và destination ở gần nhau<br>2. Chọn loại xe<br>3. Gửi request | Pickup: `10.8231, 106.6879`<br>Destination: `10.8232, 106.6880`<br>VehicleType: `MOTORBIKE` | Hệ thống xử lý request và trả về kết quả kiểm tra hợp lệ nếu dữ liệu đáp ứng điều kiện. | Medium |
+| TC-VALIDATE-011 | Kiểm tra thông tin đặt xe | Khoảng cách chuyến đi rất lớn | Backend đang hoạt động | 1. Nhập pickup và destination cách xa nhau<br>2. Chọn loại xe<br>3. Gửi request | Pickup: `TP.HCM`<br>Destination: `Hà Nội`<br>VehicleType: `CAR` | Hệ thống kiểm tra và xử lý theo giới hạn khoảng cách của hệ thống. Nếu vượt giới hạn, trả về HTTP 400. | Medium |
+| TC-VALIDATE-012 | Kiểm tra thông tin đặt xe | Dữ liệu JSON không hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Gửi body không đúng định dạng JSON | Body: `{pickup: invalid json}` | Hệ thống trả về lỗi HTTP 400 và không xử lý request. | High |
+| TC-VALIDATE-013 | Kiểm tra thông tin đặt xe | Thiếu Content-Type | Backend đang hoạt động | 1. Gửi POST request<br>2. Không gửi header Content-Type<br>3. Gửi request body | JSON hợp lệ nhưng không có `Content-Type: application/json` | Hệ thống từ chối hoặc không xử lý request đúng định dạng. | Medium |
+
+---
+
+## 2. API POST /rides/estimate
+
+### Test Scenario: Tính toán cước chuyến đi
+
+| Test Case ID | Test Scenario | Test Case | Preconditions | Test Steps | Test Data | Expected Result | Priority |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| TC-ESTIMATE-001 | Tính cước chuyến đi | Tính cước với thông tin hợp lệ | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup hợp lệ<br>3. Nhập destination hợp lệ<br>4. Chọn vehicleType | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `CAR` | Trả về HTTP 200 và response chứa estimatedFare, estimatedDistanceKm, estimatedDurationMinutes. | High |
+| TC-ESTIMATE-002 | Tính cước chuyến đi | Thiếu pickup | Backend đang hoạt động | 1. Gửi POST request<br>2. Không nhập pickup<br>3. Nhập destination<br>4. Chọn vehicleType | Pickup: `{}`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `CAR` | Trả về HTTP 400 với thông báo `Pickup location is required`. | High |
+| TC-ESTIMATE-003 | Tính cước chuyến đi | Thiếu destination | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup<br>3. Không nhập destination<br>4. Chọn vehicleType | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `{}`<br>VehicleType: `CAR` | Trả về HTTP 400 với thông báo `Destination is required`. | High |
+| TC-ESTIMATE-004 | Tính cước chuyến đi | Thiếu vehicleType | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập pickup<br>3. Nhập destination<br>4. Không chọn vehicleType | Pickup: `Đại học Công nghiệp TP.HCM`<br>Destination: `Sân bay Tân Sơn Nhất`<br>VehicleType: `empty` | Trả về HTTP 400 với thông báo `Vehicle type is required`. | High |
+| TC-ESTIMATE-005 | Tính cước chuyến đi | Toàn bộ request body rỗng | Backend đang hoạt động | 1. Gửi POST request<br>2. Gửi body `{}` | `{}` | Trả về HTTP 400. Hệ thống thông báo pickup location là bắt buộc. | High |
+| TC-ESTIMATE-006 | Tính cước chuyến đi | Pickup address rỗng | Backend đang hoạt động | 1. Nhập pickup nhưng không có address<br>2. Nhập destination<br>3. Chọn vehicleType<br>4. Gửi request | Pickup: `{"latitude":10.8241,"longitude":106.6877}`<br>Destination: hợp lệ<br>VehicleType: `CAR` | Trả về HTTP 400 với thông báo pickup location không hợp lệ. | High |
+| TC-ESTIMATE-007 | Tính cước chuyến đi | Destination address rỗng | Backend đang hoạt động | 1. Nhập pickup<br>2. Nhập destination nhưng không có address<br>3. Chọn vehicleType<br>4. Gửi request | Pickup: hợp lệ<br>Destination: `{"latitude":10.8188,"longitude":106.6519}`<br>VehicleType: `CAR` | Trả về HTTP 400 với thông báo destination không hợp lệ. | High |
+| TC-ESTIMATE-008 | Tính cước chuyến đi | VehicleType không hợp lệ | Backend đang hoạt động | 1. Nhập pickup<br>2. Nhập destination<br>3. Nhập loại xe không tồn tại<br>4. Gửi request | VehicleType: `BICYCLE` | Hệ thống từ chối request hoặc trả về HTTP 400. | High |
+| TC-ESTIMATE-009 | Tính cước chuyến đi | Khoảng cách rất ngắn | Backend đang hoạt động | 1. Nhập hai địa điểm gần nhau<br>2. Chọn vehicleType<br>3. Gửi request | Pickup: `10.8231, 106.6879`<br>Destination: `10.8232, 106.6880`<br>VehicleType: `MOTORBIKE` | Hệ thống trả về HTTP 200 và thông tin cước tương ứng với chuyến đi ngắn. | Medium |
+| TC-ESTIMATE-010 | Tính cước chuyến đi | Khoảng cách rất lớn | Backend đang hoạt động | 1. Nhập hai địa điểm cách xa nhau<br>2. Chọn vehicleType<br>3. Gửi request | Pickup: `TP.HCM`<br>Destination: `Hà Nội`<br>VehicleType: `CAR` | Hệ thống xử lý theo giới hạn khoảng cách được quy định. Nếu vượt giới hạn, trả về lỗi phù hợp. | Medium |
+| TC-ESTIMATE-011 | Tính cước chuyến đi | Latitude và longitude ở giá trị biên hợp lệ | Backend đang hoạt động | 1. Nhập latitude và longitude tại giới hạn hợp lệ<br>2. Nhập đầy đủ thông tin<br>3. Gửi request | Latitude: `90`<br>Longitude: `180`<br>VehicleType: `CAR` | Hệ thống tiếp nhận hoặc xử lý theo giới hạn tọa độ được quy định. | Medium |
+| TC-ESTIMATE-012 | Tính cước chuyến đi | Latitude vượt giới hạn | Backend đang hoạt động | 1. Nhập latitude lớn hơn 90<br>2. Nhập longitude hợp lệ<br>3. Gửi request | Latitude: `91`<br>Longitude: `106.6877`<br>VehicleType: `CAR` | Hệ thống từ chối request và trả về HTTP 400. | Medium |
+| TC-ESTIMATE-013 | Tính cước chuyến đi | Longitude vượt giới hạn | Backend đang hoạt động | 1. Nhập longitude lớn hơn 180<br>2. Nhập latitude hợp lệ<br>3. Gửi request | Latitude: `10.8231`<br>Longitude: `181`<br>VehicleType: `CAR` | Hệ thống từ chối request và trả về HTTP 400. | Medium |
+| TC-ESTIMATE-014 | Tính cước chuyến đi | Request body sai định dạng JSON | Backend đang hoạt động | 1. Gửi POST request<br>2. Nhập JSON không hợp lệ | `{pickup: invalid}` | Trả về HTTP 400 và không thực hiện tính cước. | High |
+| TC-ESTIMATE-015 | Tính cước chuyến đi | Gửi sai HTTP Method | Backend đang hoạt động | 1. Gọi `/rides/estimate` bằng GET thay vì POST | GET `/rides/estimate` | Hệ thống trả về HTTP 404 hoặc Method Not Allowed tùy cấu hình backend. | Medium |
+| TC-ESTIMATE-016 | Tính cước chuyến đi | Gọi API không tồn tại | Backend đang hoạt động | 1. Gửi POST request đến endpoint sai | POST `/rides/estimated` | Trả về HTTP 404 Not Found. | Low |
+
+---
+
+## 3. Tổng hợp phạm vi kiểm thử
+
+| Loại kiểm thử | Test Case |
+| :--- | :--- |
+| Positive | TC-VALIDATE-001, TC-ESTIMATE-001 |
+| Negative | TC-VALIDATE-002, TC-VALIDATE-003, TC-VALIDATE-004, TC-ESTIMATE-002, TC-ESTIMATE-003, TC-ESTIMATE-008 |
+| Empty / Null | TC-VALIDATE-005, TC-VALIDATE-006, TC-VALIDATE-007, TC-VALIDATE-008, TC-ESTIMATE-002, TC-ESTIMATE-003, TC-ESTIMATE-004, TC-ESTIMATE-005 |
+| Boundary | TC-VALIDATE-010, TC-VALIDATE-011, TC-ESTIMATE-009, TC-ESTIMATE-010, TC-ESTIMATE-011, TC-ESTIMATE-012, TC-ESTIMATE-013 |
+| Error | TC-VALIDATE-012, TC-VALIDATE-013, TC-ESTIMATE-014, TC-ESTIMATE-015, TC-ESTIMATE-016 |
 
 
