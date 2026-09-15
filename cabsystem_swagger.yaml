@@ -1,0 +1,1715 @@
+openapi: 3.0.3
+
+info:
+  title: CABSYSTEM API
+  description: API Documentation for CABSYSTEM - Online Ride Booking System
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local server
+
+tags:
+  - name: Rides
+    description: Đặt xe và quản lý chuyến đi
+  - name: Drivers
+    description: Tìm kiếm, phân công và quản lý tài xế
+  - name: Ratings
+    description: Đánh giá chuyến đi và tài xế
+  - name: Fare
+    description: Tính và quản lý cước
+  - name: Payments
+    description: Thanh toán và giao dịch
+  - name: Notifications
+    description: Quản lý thông báo
+  - name: Driver Management
+    description: Quản lý hồ sơ và trạng thái tài xế
+  - name: Vehicles
+    description: Quản lý phương tiện
+  - name: Operations
+    description: Quản lý vận hành
+  - name: Reports
+    description: Báo cáo và thống kê
+  - name: Authentication
+    description: Xác thực và phân quyền
+  - name: System
+    description: Kiểm tra hệ thống
+
+paths:
+
+  /:
+    get:
+      tags: [System]
+      summary: Kiểm tra backend
+      responses:
+        '200':
+          description: Backend đang hoạt động
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: CABSYSTEM Backend is running!
+
+  # ============================================================
+  # BR-01 - Đặt xe trực tuyến
+  # FR-01.1, FR-01.2, FR-01.3, FR-01.5
+  # ============================================================
+
+  /rides/validate:
+    post:
+      tags: [Rides]
+      summary: Kiểm tra thông tin đặt xe
+      description: FR-01.1, FR-01.2, FR-01.3, FR-01.5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+      responses:
+        '200':
+          description: Ride information is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideValidationResponse'
+        '400':
+          description: Invalid ride information
+
+  /rides/estimate:
+    post:
+      tags: [Rides, Fare]
+      summary: Ước tính giá chuyến xe
+      description: Xác định thông tin và tính cước dự kiến trước khi đặt xe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+      responses:
+        '200':
+          description: Fare estimation calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FareEstimate'
+        '400':
+          description: Invalid ride information
+
+  /rides:
+    post:
+      tags: [Rides]
+      summary: Tạo yêu cầu đặt xe
+      description: FR-01.4 - Khách hàng gửi yêu cầu đặt xe.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRideRequest'
+      responses:
+        '201':
+          description: Ride request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+        '400':
+          description: Invalid ride information
+        '401':
+          description: Unauthorized
+
+  /rides/{rideId}:
+    get:
+      tags: [Rides]
+      summary: Xem thông tin và trạng thái chuyến
+      description: FR-01.6, FR-03.5
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Ride information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+        '404':
+          description: Ride not found
+
+  /rides/{rideId}/cancel:
+    post:
+      tags: [Rides]
+      summary: Hủy yêu cầu đặt xe
+      description: FR-01.7 - Hủy yêu cầu theo chính sách doanh nghiệp.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: Có việc đột xuất
+      responses:
+        '200':
+          description: Ride cancelled successfully
+        '400':
+          description: Ride cannot be cancelled
+        '404':
+          description: Ride not found
+
+  # ============================================================
+  # BR-02 - Tự động tìm và phân công tài xế
+  # ============================================================
+
+  /rides/{rideId}/drivers/search:
+    get:
+      tags: [Drivers]
+      summary: Tìm tài xế phù hợp
+      description: FR-02.1, FR-02.2
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Suitable drivers found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  drivers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Driver'
+        '404':
+          description: No suitable driver found
+
+  /rides/{rideId}/drivers/notify:
+    post:
+      tags: [Drivers, Notifications]
+      summary: Gửi yêu cầu chuyến đến tài xế
+      description: FR-02.3, FR-07.7
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [driverId]
+              properties:
+                driverId:
+                  type: string
+                  example: DR001
+      responses:
+        '200':
+          description: Driver notified successfully
+        '404':
+          description: Driver or ride not found
+
+  /rides/{rideId}/accept:
+    post:
+      tags: [Drivers]
+      summary: Tài xế chấp nhận chuyến
+      description: FR-02.4
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [driverId]
+              properties:
+                driverId:
+                  type: string
+                  example: DR001
+      responses:
+        '200':
+          description: Driver accepted the ride
+        '400':
+          description: Ride cannot be accepted
+
+  /rides/{rideId}/drivers/reject:
+    post:
+      tags: [Drivers]
+      summary: Tài xế từ chối chuyến
+      description: FR-02.5
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [driverId]
+              properties:
+                driverId:
+                  type: string
+                  example: DR001
+                reason:
+                  type: string
+                  example: Không thể nhận chuyến
+      responses:
+        '200':
+          description: Driver rejection recorded
+
+  /rides/{rideId}/drivers/timeout:
+    post:
+      tags: [Drivers]
+      summary: Xử lý tài xế không phản hồi
+      description: FR-02.6
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [driverId]
+              properties:
+                driverId:
+                  type: string
+                  example: DR001
+      responses:
+        '200':
+          description: Driver timeout handled
+
+  /rides/{rideId}/drivers/status:
+    get:
+      tags: [Drivers]
+      summary: Kiểm tra trạng thái phân công tài xế
+      description: FR-02.7
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Driver assignment status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: SEARCHING
+                  message:
+                    type: string
+                    example: Đang tìm tài xế phù hợp
+
+  # ============================================================
+  # BR-03 - Theo dõi chuyến đi
+  # ============================================================
+
+  /rides/{rideId}/driver:
+    get:
+      tags: [Rides]
+      summary: Xem thông tin tài xế
+      description: FR-03.1
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Driver information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Driver'
+
+  /rides/{rideId}/vehicle:
+    get:
+      tags: [Rides, Vehicles]
+      summary: Xem thông tin phương tiện
+      description: FR-03.2
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Vehicle information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+
+  /rides/{rideId}/location:
+    get:
+      tags: [Rides]
+      summary: Theo dõi vị trí tài xế
+      description: FR-03.3
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Current driver location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+
+  /rides/{rideId}/eta:
+    get:
+      tags: [Rides]
+      summary: Xem thời gian dự kiến
+      description: FR-03.4
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Estimated arrival time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estimatedMinutes:
+                    type: integer
+                    example: 7
+                  estimatedArrival:
+                    type: string
+                    example: "18:30"
+
+  /rides/{rideId}/status:
+    put:
+      tags: [Rides]
+      summary: Cập nhật trạng thái chuyến
+      description: FR-03.5
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [SEARCHING, DRIVER_ASSIGNED, DRIVER_ARRIVING, IN_PROGRESS, COMPLETED, CANCELLED]
+                  example: IN_PROGRESS
+      responses:
+        '200':
+          description: Ride status updated
+
+  # ============================================================
+  # BR-04 - Đánh giá chuyến đi
+  # ============================================================
+
+  /rides/{rideId}/rating:
+    post:
+      tags: [Ratings]
+      summary: Đánh giá tài xế và gửi phản hồi
+      description: FR-04.1, FR-04.2, FR-04.3, FR-04.4
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequest'
+      responses:
+        '201':
+          description: Rating saved successfully
+        '400':
+          description: Ride is not completed or rating is invalid
+        '409':
+          description: Ride has already been rated
+
+  /drivers/{driverId}/ratings:
+    get:
+      tags: [Ratings]
+      summary: Tra cứu đánh giá tài xế
+      description: FR-04.5
+      parameters:
+        - $ref: '#/components/parameters/DriverId'
+      responses:
+        '200':
+          description: Driver ratings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  averageRating:
+                    type: number
+                    format: float
+                    example: 4.7
+                  ratings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rating'
+
+  # ============================================================
+  # BR-05 - Tính cước
+  # ============================================================
+
+  /rides/{rideId}/fare:
+    get:
+      tags: [Fare]
+      summary: Xem thông tin cước
+      description: FR-05.1, FR-05.3, FR-05.4, FR-05.5
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      responses:
+        '200':
+          description: Fare information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fare'
+    post:
+      tags: [Fare]
+      summary: Tính cước chuyến đi
+      description: FR-05.1, FR-05.2, FR-05.3
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FareCalculationRequest'
+      responses:
+        '200':
+          description: Fare calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fare'
+
+  # ============================================================
+  # BR-06 - Quản lý thanh toán
+  # ============================================================
+
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Khởi tạo thanh toán
+      description: FR-06.1, FR-06.2
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  /payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Tra cứu giao dịch
+      description: FR-06.7
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Transaction information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  /payments/{paymentId}/result:
+    post:
+      tags: [Payments]
+      summary: Nhận và xử lý kết quả thanh toán
+      description: FR-06.3, FR-06.4, FR-06.5
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [SUCCESS, FAILED]
+                  example: SUCCESS
+                transactionId:
+                  type: string
+                  example: TXN123456
+                message:
+                  type: string
+                  example: Payment successful
+      responses:
+        '200':
+          description: Payment result processed
+
+  /payments/{paymentId}/retry:
+    post:
+      tags: [Payments]
+      summary: Thanh toán lại
+      description: FR-06.6
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Payment retry initiated
+
+  # ============================================================
+  # BR-07 - Quản lý thông báo
+  # ============================================================
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Lấy danh sách thông báo
+      description: FR-07.1 đến FR-07.8
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+    post:
+      tags: [Notifications]
+      summary: Tạo và gửi thông báo
+      description: Hỗ trợ các loại thông báo về chuyến đi và thanh toán.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+      responses:
+        '201':
+          description: Notification created
+
+  # ============================================================
+  # BR-08 - Quản lý tài xế và phương tiện
+  # ============================================================
+
+  /drivers:
+    get:
+      tags: [Driver Management]
+      summary: Tra cứu danh sách tài xế
+      description: FR-08.1, FR-08.5
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Driver list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Driver'
+    post:
+      tags: [Driver Management]
+      summary: Tạo tài khoản tài xế
+      description: FR-08.6
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDriverRequest'
+      responses:
+        '201':
+          description: Driver account created
+
+  /drivers/{driverId}:
+    get:
+      tags: [Driver Management]
+      summary: Xem hồ sơ tài xế
+      description: FR-08.1
+      parameters:
+        - $ref: '#/components/parameters/DriverId'
+      responses:
+        '200':
+          description: Driver profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Driver'
+    put:
+      tags: [Driver Management]
+      summary: Cập nhật hồ sơ tài xế
+      description: FR-08.1
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DriverId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DriverUpdateRequest'
+      responses:
+        '200':
+          description: Driver profile updated
+
+  /drivers/{driverId}/status:
+    put:
+      tags: [Driver Management]
+      summary: Cập nhật trạng thái hoạt động
+      description: FR-08.3
+      parameters:
+        - $ref: '#/components/parameters/DriverId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [AVAILABLE, BUSY, OFFLINE]
+                  example: AVAILABLE
+      responses:
+        '200':
+          description: Driver status updated
+
+  /drivers/{driverId}/location:
+    put:
+      tags: [Driver Management]
+      summary: Cập nhật vị trí tài xế
+      description: FR-08.4
+      parameters:
+        - $ref: '#/components/parameters/DriverId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Location'
+      responses:
+        '200':
+          description: Driver location updated
+
+  # ============================================================
+  # FR-08.2, BR-09.3 - Phương tiện
+  # ============================================================
+
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: Tra cứu phương tiện
+      description: FR-08.2, FR-09.3
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vehicle list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+    post:
+      tags: [Vehicles]
+      summary: Thêm phương tiện
+      description: FR-08.2
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+      responses:
+        '201':
+          description: Vehicle created
+
+  /vehicles/{vehicleId}:
+    get:
+      tags: [Vehicles]
+      summary: Xem phương tiện
+      parameters:
+        - $ref: '#/components/parameters/VehicleId'
+      responses:
+        '200':
+          description: Vehicle information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+    put:
+      tags: [Vehicles]
+      summary: Cập nhật phương tiện
+      description: FR-08.2
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VehicleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+      responses:
+        '200':
+          description: Vehicle updated
+
+  # ============================================================
+  # BR-09 - Quản lý vận hành
+  # ============================================================
+
+  /operations/customers:
+    get:
+      tags: [Operations]
+      summary: Quản lý khách hàng
+      description: FR-09.1
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+
+  /operations/drivers:
+    get:
+      tags: [Operations]
+      summary: Quản lý tài xế
+      description: FR-09.2
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Driver list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Driver'
+
+  /operations/vehicles:
+    get:
+      tags: [Operations]
+      summary: Quản lý phương tiện
+      description: FR-09.3
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vehicle list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+
+  /operations/rides/active:
+    get:
+      tags: [Operations]
+      summary: Theo dõi chuyến đang diễn ra
+      description: FR-09.4
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active rides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ride'
+
+  /operations/rides:
+    get:
+      tags: [Operations]
+      summary: Tra cứu chuyến đi
+      description: FR-09.5
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Ride history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ride'
+
+  /operations/transactions:
+    get:
+      tags: [Operations]
+      summary: Tra cứu giao dịch
+      description: FR-09.6
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+
+  /operations/rides/{rideId}/errors:
+    post:
+      tags: [Operations]
+      summary: Xử lý chuyến bị lỗi
+      description: FR-09.7
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RideId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  example: REASSIGN_DRIVER
+                note:
+                  type: string
+                  example: Tài xế mất kết nối
+      responses:
+        '200':
+          description: Ride error handled
+
+  /operations/permissions:
+    get:
+      tags: [Operations, Authentication]
+      summary: Tra cứu quyền vận hành
+      description: FR-09.8, FR-11.3
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Permissions
+    put:
+      tags: [Operations, Authentication]
+      summary: Cập nhật quyền vận hành
+      description: FR-09.8, FR-11.3
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, permissions]
+              properties:
+                role:
+                  type: string
+                  example: OPERATOR
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                  example: [VIEW_RIDES, MANAGE_DRIVERS]
+      responses:
+        '200':
+          description: Permissions updated
+
+  # ============================================================
+  # BR-10 - Báo cáo và thống kê
+  # ============================================================
+
+  /reports/rides:
+    get:
+      tags: [Reports]
+      summary: Báo cáo số lượng chuyến
+      description: FR-10.1, FR-10.6
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Ride count report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /reports/revenue:
+    get:
+      tags: [Reports]
+      summary: Báo cáo doanh thu
+      description: FR-10.2, FR-10.6
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Revenue report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /reports/completion:
+    get:
+      tags: [Reports]
+      summary: Báo cáo tỷ lệ hoàn thành
+      description: FR-10.3, FR-10.6
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Completion report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /reports/cancellation:
+    get:
+      tags: [Reports]
+      summary: Báo cáo tỷ lệ hủy
+      description: FR-10.4, FR-10.6
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Cancellation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /reports/drivers:
+    get:
+      tags: [Reports]
+      summary: Báo cáo hiệu quả tài xế
+      description: FR-10.5, FR-10.6
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FromDate'
+        - $ref: '#/components/parameters/ToDate'
+      responses:
+        '200':
+          description: Driver performance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  # ============================================================
+  # BR-11 - Bảo mật và kiểm soát truy cập
+  # ============================================================
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Xác thực người dùng
+      description: FR-11.1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: user01
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Xem thông tin người dùng hiện tại
+      description: FR-11.1, FR-11.2, FR-11.3
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /auth/permissions:
+    get:
+      tags: [Authentication]
+      summary: Kiểm tra quyền truy cập
+      description: FR-11.2, FR-11.3
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Access permissions
+
+  /audit-logs:
+    get:
+      tags: [Authentication]
+      summary: Tra cứu nhật ký thao tác
+      description: FR-11.7
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    action:
+                      type: string
+                    userId:
+                      type: string
+                    timestamp:
+                      type: string
+                      format: date-time
+
+  # ============================================================
+  # BR-12 - Khả năng mở rộng và ổn định
+  # ============================================================
+
+  /health:
+    get:
+      tags: [System]
+      summary: Kiểm tra trạng thái hệ thống
+      description: FR-12.1, FR-12.2, FR-12.3, FR-12.4
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  # ============================================================
+  # BR-13 - Khả năng mở rộng tính năng
+  # ============================================================
+
+  /services:
+    get:
+      tags: [System]
+      summary: Danh sách loại dịch vụ
+      description: FR-13.1
+      responses:
+        '200':
+          description: Available services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: CAR
+                    name:
+                      type: string
+                      example: Car
+    post:
+      tags: [System]
+      summary: Thêm loại dịch vụ
+      description: FR-13.1
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, name]
+              properties:
+                id:
+                  type: string
+                  example: BIKE
+                name:
+                  type: string
+                  example: Motorcycle
+      responses:
+        '201':
+          description: Service created
+
+  /payment-methods:
+    get:
+      tags: [Payments]
+      summary: Danh sách phương thức thanh toán
+      description: FR-13.2
+      responses:
+        '200':
+          description: Payment methods
+
+  /notification-channels:
+    get:
+      tags: [Notifications]
+      summary: Danh sách kênh thông báo
+      description: FR-13.3
+      responses:
+        '200':
+          description: Notification channels
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+
+    RideId:
+      name: rideId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: RIDE001
+
+    DriverId:
+      name: driverId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: DR001
+
+    VehicleId:
+      name: vehicleId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: VH001
+
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: PAY001
+
+    FromDate:
+      name: from
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+      example: "2026-09-01"
+
+    ToDate:
+      name: to
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+      example: "2026-09-07"
+
+  schemas:
+
+    Location:
+      type: object
+      required: [address, latitude, longitude]
+      properties:
+        address:
+          type: string
+          example: Đại học Công nghiệp TP.HCM
+        latitude:
+          type: number
+          format: double
+          example: 10.8241
+        longitude:
+          type: number
+          format: double
+          example: 106.6877
+
+    RideRequest:
+      type: object
+      required: [pickup, destination, vehicleType]
+      properties:
+        pickup:
+          $ref: '#/components/schemas/Location'
+        destination:
+          $ref: '#/components/schemas/Location'
+        vehicleType:
+          type: string
+          example: CAR
+
+    CreateRideRequest:
+      allOf:
+        - $ref: '#/components/schemas/RideRequest'
+        - type: object
+          properties:
+            paymentMethod:
+              type: string
+              enum: [CASH, CARD, E_WALLET]
+              example: CASH
+
+    RideValidationResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Ride information is valid
+        estimatedFare:
+          type: number
+          example: 75000
+        estimatedDistanceKm:
+          type: number
+          example: 8.5
+        estimatedDurationMinutes:
+          type: integer
+          example: 25
+
+    FareEstimate:
+      type: object
+      properties:
+        estimatedFare:
+          type: number
+          example: 75000
+        estimatedDistanceKm:
+          type: number
+          example: 8.5
+        estimatedDurationMinutes:
+          type: integer
+          example: 25
+
+    Ride:
+      type: object
+      properties:
+        id:
+          type: string
+          example: RIDE001
+        customerId:
+          type: string
+          example: CUS001
+        pickup:
+          $ref: '#/components/schemas/Location'
+        destination:
+          $ref: '#/components/schemas/Location'
+        vehicleType:
+          type: string
+          example: CAR
+        status:
+          type: string
+          enum: [SEARCHING, DRIVER_ASSIGNED, DRIVER_ARRIVING, IN_PROGRESS, COMPLETED, CANCELLED]
+          example: SEARCHING
+        driverId:
+          type: string
+          nullable: true
+          example: DR001
+        estimatedFare:
+          type: number
+          example: 75000
+        finalFare:
+          type: number
+          nullable: true
+          example: 78000
+        createdAt:
+          type: string
+          format: date-time
+
+    Driver:
+      type: object
+      properties:
+        id:
+          type: string
+          example: DR001
+        name:
+          type: string
+          example: Nguyen Van A
+        phone:
+          type: string
+          example: "0901234567"
+        status:
+          type: string
+          enum: [AVAILABLE, BUSY, OFFLINE]
+          example: AVAILABLE
+        rating:
+          type: number
+          format: float
+          example: 4.8
+        location:
+          $ref: '#/components/schemas/Location'
+
+    DriverUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        licenseNumber:
+          type: string
+
+    CreateDriverRequest:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+          example: Nguyen Van A
+        phone:
+          type: string
+          example: "0901234567"
+        licenseNumber:
+          type: string
+          example: B2-123456
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          example: VH001
+        driverId:
+          type: string
+          example: DR001
+        type:
+          type: string
+          example: CAR
+        licensePlate:
+          type: string
+          example: 51A-12345
+        model:
+          type: string
+          example: Toyota Vios
+        status:
+          type: string
+          enum: [AVAILABLE, IN_USE, MAINTENANCE]
+          example: AVAILABLE
+
+    VehicleRequest:
+      type: object
+      required: [driverId, type, licensePlate]
+      properties:
+        driverId:
+          type: string
+          example: DR001
+        type:
+          type: string
+          example: CAR
+        licensePlate:
+          type: string
+          example: 51A-12345
+        model:
+          type: string
+          example: Toyota Vios
+
+    FareCalculationRequest:
+      type: object
+      properties:
+        distanceKm:
+          type: number
+          example: 8.5
+        durationMinutes:
+          type: integer
+          example: 25
+        vehicleType:
+          type: string
+          example: CAR
+
+    Fare:
+      type: object
+      properties:
+        rideId:
+          type: string
+          example: RIDE001
+        baseFare:
+          type: number
+          example: 20000
+        distanceFare:
+          type: number
+          example: 45000
+        timeFare:
+          type: number
+          example: 10000
+        totalFare:
+          type: number
+          example: 75000
+        currency:
+          type: string
+          example: VND
+
+    RatingRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment:
+          type: string
+          example: Tài xế rất thân thiện và chạy an toàn.
+
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+          example: RAT001
+        rideId:
+          type: string
+          example: RIDE001
+        driverId:
+          type: string
+          example: DR001
+        rating:
+          type: integer
+          example: 5
+        comment:
+          type: string
+          example: Dịch vụ tốt.
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentRequest:
+      type: object
+      required: [rideId, method]
+      properties:
+        rideId:
+          type: string
+          example: RIDE001
+        method:
+          type: string
+          enum: [CASH, CARD, E_WALLET]
+          example: CASH
+        amount:
+          type: number
+          example: 75000
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          example: PAY001
+        rideId:
+          type: string
+          example: RIDE001
+        method:
+          type: string
+          example: CASH
+        amount:
+          type: number
+          example: 75000
+        status:
+          type: string
+          enum: [PENDING, SUCCESS, FAILED]
+          example: SUCCESS
+        transactionId:
+          type: string
+          nullable: true
+          example: TXN123456
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationRequest:
+      type: object
+      required: [userId, type, message]
+      properties:
+        userId:
+          type: string
+          example: CUS001
+        rideId:
+          type: string
+          nullable: true
+          example: RIDE001
+        type:
+          type: string
+          example: DRIVER_ACCEPTED
+        channel:
+          type: string
+          enum: [APP, SMS, EMAIL]
+          example: APP
+        message:
+          type: string
+          example: Tài xế đã nhận chuyến của bạn.
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          example: NOT001
+        userId:
+          type: string
+          example: CUS001
+        type:
+          type: string
+          example: DRIVER_ACCEPTED
+        message:
+          type: string
+          example: Tài xế đã nhận chuyến.
+        read:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: CUS001
+        name:
+          type: string
+          example: Tran Thi B
+        phone:
+          type: string
+          example: "0912345678"
+        email:
+          type: string
+          example: customer@example.com
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: USR001
+        username:
+          type: string
+          example: user01
+        role:
+          type: string
+          enum: [CUSTOMER, DRIVER, OPERATOR, ADMIN]
+          example: CUSTOMER
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        tokenType:
+          type: string
+          example: Bearer
+        user:
+          $ref: '#/components/schemas/User'
+
+    ReportResponse:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date
+          example: "2026-09-01"
+        to:
+          type: string
+          format: date
+          example: "2026-09-07"
+        data:
+          type: object
+          additionalProperties: true
