@@ -1743,4 +1743,48 @@ Các quy tắc trên tương ứng với nhóm yêu cầu BR-04 và FR-06.1 đ�
 | **BRL-56** | Bảo vệ Audit Log | Audit Log phải được bảo vệ và chỉ người dùng có quyền mới được phép truy cập. |
 
 ---
+## 1. Phân rã Sub-domain 
 
+```mermaid
+flowchart LR
+    SD1(["User / IAM"])
+    SD2(["Booking"])
+    SD3(["Driver"])
+    SD4(["Payment"])
+    SD5(["Notification"])
+    SD6(["Operation"])
+
+    S1["User Service"]
+    S2["Booking Service"]
+    S3["Driver Service"]
+    S4["Payment Service"]
+    S5["Notification Service"]
+    S6["Operation Service"]
+
+    SD1 --> S1
+    SD2 --> S2
+    SD3 --> S3
+    SD4 --> S4
+    SD5 --> S5
+    SD6 --> S6
+```
+## 2. Luồng tương tác giữa các Service
+
+```mermaid
+flowchart TB
+    U["User Service<br/>user_db"]
+    B["Booking Service<br/>booking_db"]
+    D["Driver Service<br/>driver_db"]
+    P["Payment Service<br/>payment_db"]
+    N["Notification Service<br/>notification_db"]
+    O["Operation Service<br/>operation_db"]
+
+    U -->|"① Call - Đặt xe"| B
+    B -->|"② Scan - Tìm tài xế phù hợp"| D
+    D -->|"③ Result - Tài xế nhận chuyến"| B
+    B -->|"④ Result / Update - Cập nhật trạng thái chuyến"| U
+    B -->|"⑤ Payment - Tính cước, thanh toán"| P
+    B -.->|"⑥ Event - Gửi thông báo"| N
+    B -.->|"⑦ Event - Cập nhật vận hành"| O
+    P -.->|"⑧ Event - Thông tin thanh toán"| O
+```
